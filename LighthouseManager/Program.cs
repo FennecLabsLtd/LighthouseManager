@@ -52,7 +52,28 @@ namespace LighthouseManager
 
         static void PrintDebug()
         {
+            Console.Clear();
             Console.WriteLine("LocalAppData: " + Environment.GetEnvironmentVariable("LocalAppData"));
+            OpenVRConfig ovr = GetOpenVRConfig();
+
+            if(ovr == null)
+            {
+                Console.WriteLine("OpenVR Path File: Not Found");
+            } else
+            {
+                foreach (string s in ovr.configPaths)
+                    Console.WriteLine("OpenVR Config Path: " + s);
+
+                foreach (string s in ovr.logPaths)
+                    Console.WriteLine("OpenVR Log Path: " + s);
+
+                foreach (string s in ovr.runtimePaths)
+                    Console.WriteLine("OpenVR Runtime Path: " + s);
+
+                foreach (string s in ovr.externalDrivers)
+                    Console.WriteLine("OpenVR External Drivers: " + s);
+            }
+
             Console.WriteLine("========");
             Console.WriteLine("Press Enter to return to the main menu");
             Console.ReadLine();
@@ -84,6 +105,7 @@ namespace LighthouseManager
         static bool DoMainMenu()
         {
             Console.Clear();
+            Console.WriteLine("WARNING: Please close SteamVR before doing this");
             Console.WriteLine("Welcome to the Lighthouse Manager, please select an option from the below: ");
             Console.WriteLine("1) Save Current Room Setup");
             Console.WriteLine("2) Restore Saved Room Setup");
