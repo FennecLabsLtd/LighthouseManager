@@ -4,6 +4,8 @@
 
 Lighthouse Manager is a quick and easy way to save/restore your Lighthouse and Chaperone configs. We recommend using it from a shared network drive or USB stick so that you can very quickly open it, restore your room setup and move on to the next PC.
 
+You can download the latest build [here](https://github.com/FennecLabsLtd/LighthouseManager/releases/latest)
+
 ## Usage
 
 It's so ridiculously easy to use, just run the EXE and the rest is self explanatory 
