@@ -1,6 +1,6 @@
 # Lighthouse Manager
 
-[![Build status](https://ci.appveyor.com/api/projects/status/ekw2gnwcdhjaphjh?svg=true)](https://ci.appveyor.com/project/BenWoodford/lighthousemanager)
+[![Build status](https://ci.appveyor.com/api/projects/status/ekw2gnwcdhjaphjh?svg=true)](https://ci.appveyor.com/project/FennecLabs/lighthousemanager)
 
 Lighthouse Manager is a quick and easy way to save/restore your Lighthouse and Chaperone configs. We recommend using it from a shared network drive or USB stick so that you can very quickly open it, restore your room setup and move on to the next PC.
 
