@@ -114,6 +114,7 @@ namespace LighthouseManager
             Console.WriteLine("5) View Warranty Disclaimer");
             Console.WriteLine("");
 
+            Console.Write("Enter your Selection: ");
             string input = Console.ReadLine().Trim();
 
             switch(input)
