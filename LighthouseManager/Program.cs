@@ -199,6 +199,9 @@ namespace LighthouseManager
                     {
                         validFilename = true;
                     }
+                } else
+                {
+                    validFilename = true;
                 }
             }
 
