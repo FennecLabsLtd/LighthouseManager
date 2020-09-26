@@ -12,12 +12,12 @@ It's so ridiculously easy to use, just run the EXE and the rest is self explanat
 
 ### Command Line Usage
 
-| Argument | Description |
-| -------- | ----------- |
-| -s [filename], --save [filename] | Specifies the map file to save to (with or without the .rcfg extension, it will be added automatically) |
-| -l [filename], --load [filename] | Specifies the file load from (again, with or without the .rcfg extension) |
-| -r, --restart | Stops SteamVR before running any save/load (generally only needed when loading), and starts it again when finished |
-| -?, --help | Displays the help text |
+| Short Version | Long Version | Description |
+| -------------- | ------------- | ----------- |
+| `-s [filename]` | `--save [filename]` | Specifies the map file to save to (with or without the .rcfg extension, it will be added automatically) |
+| `-l [filename]` | `--load [filename]` | Specifies the file load from (again, with or without the .rcfg extension) |
+| `-r` | `--restart` | Stops SteamVR before running any save/load (generally only needed when loading), and starts it again when finished |
+| `-?`| `--help` | Displays the help text |
 
 ## Contributing
 
