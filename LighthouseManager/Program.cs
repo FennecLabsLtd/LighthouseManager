@@ -6,6 +6,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.IO.Compression;
+using Valve.VR;
+using System.Threading;
+using Utility.CommandLine;
 
 namespace LighthouseManager
 {
@@ -13,6 +16,25 @@ namespace LighthouseManager
     {
         static readonly string ChaperoneFilename = "chaperone_info.vrchap";
         static readonly string LighthouseFilename = "lighthousedb.json";
+
+        static bool automated = false;
+        static bool didFindConfig = false;
+
+        [Argument('s', "save", "Name of the file under maps/ to save to")]
+        static string saveFilename { get; set; }
+
+        [Argument('l', "load", "Name of the file under maps/ to load from")]
+        static string loadFilename { get; set; }
+
+        [Argument('r', "restart", "Stops SteamVR and restart when done")]
+        static bool restart { get; set; }
+
+        [Argument('?', "help", "Shows this help message")]
+        static bool help { get; set; }
+
+        [Operands]
+        static string[] Operands { get; set; }
+
         class OpenVRConfig
         {
             [JsonProperty("config")]
@@ -35,31 +57,109 @@ namespace LighthouseManager
 
         static void Main(string[] args)
         {
-            // TODO: Command Line Args Mode
+            Arguments.Populate();
 
-            if(!Directory.Exists("maps"))
+            if (!Directory.Exists("maps"))
             {
                 Directory.CreateDirectory("maps");
             }
 
+            HandleCommandLine();
+
             bool doQuit = false;
 
-            while(!doQuit)
+            while (!doQuit)
             {
                 doQuit = !DoMainMenu();
             }
         }
 
+        static void Exit(int exitCode)
+        {
+            if (System.Diagnostics.Debugger.IsAttached)
+            {
+                Console.ReadLine();
+            }
+
+            Environment.Exit(exitCode);
+        }
+
+        static void ShowCommandLineHelp()
+        {
+            Console.WriteLine("Command Line Arguments:");
+
+            Console.WriteLine("-s [filename], --save [filename]");
+            Console.WriteLine("Name of the rcfg file under maps/ to create/overwrite");
+            Console.WriteLine();
+
+            Console.WriteLine("-l [filename], --load [filename]");
+            Console.WriteLine("Name of the rcfg file under maps/ to load in to SteamVR");
+            Console.WriteLine();
+
+            Console.WriteLine("-r, --restart");
+            Console.WriteLine("Stops SteamVR (if running) and then restarts once done saving/loading the rcfg file specified by --save/--load");
+            Console.WriteLine();
+
+            Console.WriteLine("-?, --help");
+            Console.WriteLine("Shows this help text");
+
+        }
+
+        static void HandleCommandLine()
+        {
+            bool doRestart = false;
+
+            if (help)
+            {
+                ShowCommandLineHelp();
+                Exit(0);
+            }
+
+            if (restart)
+            {
+                doRestart = true;
+                automated = true;
+                CloseSteamVR();
+            }
+
+            if (saveFilename != null)
+            {
+                automated = true;
+                SaveMenu();
+            }
+            else if (loadFilename != null)
+            {
+                automated = true;
+                RestoreMenu();
+            }
+
+            if (doRestart)
+                OpenSteamVR();
+
+            if (automated)
+            {
+                Exit(0);
+                return;
+            }
+        }
+
+        static void Clear()
+        {
+            if (!automated)
+                Console.Clear();
+        }
+
         static void PrintDebug()
         {
-            Console.Clear();
+            Clear();
             Console.WriteLine("LocalAppData: " + Environment.GetEnvironmentVariable("LocalAppData"));
             OpenVRConfig ovr = GetOpenVRConfig();
 
-            if(ovr == null)
+            if (ovr == null)
             {
                 Console.WriteLine("OpenVR Path File: Not Found");
-            } else
+            }
+            else
             {
                 foreach (string s in ovr.configPaths)
                     Console.WriteLine("OpenVR Config Path: " + s);
@@ -91,33 +191,37 @@ namespace LighthouseManager
 
             OpenVRConfig configData = JsonConvert.DeserializeObject<OpenVRConfig>(File.ReadAllText(jsonPath));
 
-            if(configData.configPaths == null || configData.configPaths.Count == 0)
+            if (configData.configPaths == null || configData.configPaths.Count == 0)
             {
                 Console.WriteLine("Cannot find a config path entry in OpenVR Paths file.");
                 return null;
             }
 
-            Console.WriteLine("Found Config Path: " + configData.configPaths[0]);
+            if (!automated || !didFindConfig)
+                Console.WriteLine("Found Config Path: " + configData.configPaths[0]);
+
+            didFindConfig = true;
 
             return configData;
         }
 
         static bool DoMainMenu()
         {
-            Console.Clear();
+            Clear();
             Console.WriteLine("WARNING: Please close SteamVR before doing this");
             Console.WriteLine("Welcome to the Lighthouse Manager, please select an option from the below: ");
             Console.WriteLine("1) Save Current Room Setup");
             Console.WriteLine("2) Restore Saved Room Setup");
             Console.WriteLine("3) Print Debug Data");
-            Console.WriteLine("4) Quit");
-            Console.WriteLine("5) View Warranty Disclaimer");
+            Console.WriteLine("4) Restart SteamVR");
+            Console.WriteLine("5) Quit");
+            Console.WriteLine("6) View Warranty Disclaimer");
             Console.WriteLine("");
 
             Console.Write("Enter your Selection: ");
             string input = Console.ReadLine().Trim();
 
-            switch(input)
+            switch (input)
             {
                 case "1":
                     SaveMenu();
@@ -132,9 +236,14 @@ namespace LighthouseManager
                     break;
 
                 case "4":
-                    return false;
+                    CloseSteamVR();
+                    OpenSteamVR();
+                    break;
 
                 case "5":
+                    return false;
+
+                case "6":
                     WarrantyOutput();
                     break;
             }
@@ -142,12 +251,60 @@ namespace LighthouseManager
             return true;
         }
 
+        static void RunBatch(string file, string args)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
+            {
+                FileName = file,
+                Arguments = args,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            }).WaitForExit();
+        }
+
+        static void CloseSteamVR()
+        {
+            Clear();
+
+            OpenVRConfig config = GetOpenVRConfig();
+
+            Console.WriteLine("Closing SteamVR... please wait");
+            RunBatch("stopsteamvr.bat", config.runtimePaths[0]);
+
+            if (!automated)
+            {
+                Console.WriteLine("Success, press enter to continue...");
+                Console.ReadLine();
+            }
+        }
+
+        static void OpenSteamVR()
+        {
+            Clear();
+
+            OpenVRConfig config = GetOpenVRConfig();
+
+            Console.WriteLine("Starting SteamVR... please wait");
+
+            RunBatch("startsteamvr.bat", "\"" + config.runtimePaths[0] + "\"");
+
+            if (!automated)
+            {
+                Console.WriteLine("Success, press enter to continue...");
+                Console.ReadLine();
+            }
+        }
+
         static void WarrantyOutput()
         {
-            Console.Clear();
+            Clear();
             Console.WriteLine("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.");
-            Console.WriteLine("Press Enter to return to the main menu");
-            Console.ReadLine();
+
+            if (!automated)
+            {
+                Console.WriteLine("Press Enter to return to the main menu");
+                Console.ReadLine();
+            }
         }
 
         static string GetChaperonePath(OpenVRConfig config)
@@ -162,13 +319,23 @@ namespace LighthouseManager
 
         static void SaveMenu()
         {
-            Console.Clear();
+            Clear();
             OpenVRConfig openVRConfig = GetOpenVRConfig();
 
             if (openVRConfig == null)
             {
-                Console.WriteLine("Press Enter to return to the main menu");
-                Console.ReadLine();
+                Console.WriteLine("OpenVR Data not found!");
+
+                if (!automated)
+                {
+                    Console.WriteLine("Press Enter to return to the main menu");
+                    Console.ReadLine();
+                }
+                else
+                {
+                    Environment.Exit(1);
+                }
+
                 return;
             }
 
@@ -181,26 +348,41 @@ namespace LighthouseManager
 
             while (!validFilename)
             {
-                Console.Write("Please enter a name for the saved room setup config: ");
-                filename = Console.ReadLine().Trim() + ".rcfg";
-
-                if (filename == ".rcfg")
+                if (automated)
                 {
-                    Console.WriteLine("No filename provided, please try again.");
-                    validFilename = false;
-                    continue;
+                    filename = saveFilename.ToLower().EndsWith(".rcfg") ? saveFilename : saveFilename + ".rcfg";
+                }
+                else
+                {
+                    Console.Write("Please enter a name for the saved room setup config: ");
+                    filename = Console.ReadLine().Trim() + ".rcfg";
+
+                    if (filename == ".rcfg")
+                    {
+                        Console.WriteLine("No filename provided, please try again.");
+                        validFilename = false;
+                        continue;
+                    }
                 }
 
-                if(File.Exists(Path.Combine("maps", filename)))
+                if (!automated)
                 {
-                    Console.Write("The file maps/" + filename + " already exists, are you sure you wish to overwrite it? (Y/N): ");
-                    string confirmation = Console.ReadLine();
+                    if (File.Exists(Path.Combine("maps", filename)))
+                    {
+                        Console.Write("The file maps/" + filename + " already exists, are you sure you wish to overwrite it? (Y/N): ");
+                        string confirmation = Console.ReadLine();
 
-                    if(confirmation.Trim().ToLower() == "y")
+                        if (confirmation.Trim().ToLower() == "y")
+                        {
+                            validFilename = true;
+                        }
+                    }
+                    else
                     {
                         validFilename = true;
                     }
-                } else
+                }
+                else
                 {
                     validFilename = true;
                 }
@@ -209,19 +391,37 @@ namespace LighthouseManager
             if (ZipConfig(Path.Combine("maps", filename), chaperonePath, lighthouseDbPath))
             {
 
-                Console.WriteLine("Room Setup saved to " + "maps/" + filename + ", press Enter to return to the main menu");
-                Console.ReadLine();
-            } else
+                Console.WriteLine("Room Setup saved to " + "maps/" + filename);
+
+                if (!automated)
+                {
+                    Console.WriteLine("Press Enter to return to the main menu");
+                    Console.ReadLine();
+                }
+
+                return;
+            }
+            else
             {
-                Console.WriteLine("Error saving room setup, press Enter to return to the main menu");
-                Console.ReadLine();
+                Console.WriteLine("Error saving room setup!");
+
+                if (!automated)
+                {
+                    Console.WriteLine("Press Enter to return to the main menu");
+                    Console.ReadLine();
+                }
+                else
+                {
+                    Exit(1);
+                }
+
                 return;
             }
         }
 
         static bool ZipConfig(string zipPath, string chaperonePath, string lighthouseDbPath)
         {
-            if(!Directory.Exists("temp"))
+            if (!Directory.Exists("temp"))
                 Directory.CreateDirectory("temp");
 
             File.Copy(chaperonePath, Path.Combine("temp", ChaperoneFilename), true);
@@ -233,7 +433,8 @@ namespace LighthouseManager
             try
             {
                 ZipFile.CreateFromDirectory("temp", zipPath);
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
                 Console.WriteLine("Error Writing File: " + e.Message);
                 return false;
@@ -275,7 +476,7 @@ namespace LighthouseManager
 
         static void RestoreMenu()
         {
-            Console.Clear();
+            Clear();
 
             string[] maps = Directory.GetFiles("maps", "*.rcfg");
 
@@ -283,8 +484,18 @@ namespace LighthouseManager
 
             if (openVRConfig == null)
             {
-                Console.WriteLine("Press Enter to return to the main menu");
-                Console.ReadLine();
+                Console.WriteLine("OpenVR Data not found!");
+
+                if (!automated)
+                {
+                    Console.WriteLine("Press Enter to return to the main menu");
+                    Console.ReadLine();
+                }
+                else
+                {
+                    Environment.Exit(1);
+                }
+
                 return;
             }
 
@@ -293,8 +504,18 @@ namespace LighthouseManager
 
             if (maps.Length == 0)
             {
-                Console.WriteLine("No room setups found in the maps folder, press Enter to return to the main menu");
-                Console.ReadLine();
+                Console.WriteLine("No room setups found in the maps folder!");
+
+                if (!automated)
+                {
+                    Console.WriteLine("Press Enter to return to the main menu");
+                    Console.ReadLine();
+                }
+                else
+                {
+                    Exit(1);
+                }
+
                 return;
             }
 
@@ -302,55 +523,83 @@ namespace LighthouseManager
 
             while (!correct)
             {
-                Console.WriteLine("The following maps have been found:");
+                string filename = null;
 
-                int i = 1;
-
-                foreach (string m in maps)
+                if (!automated)
                 {
-                    Console.WriteLine(i + ") " + m.Substring(5, m.Length - 10));
-                    i++;
-                }
 
-                Console.Write("Enter the number corresponding to the map you wish to restore on this PC: ");
-                string input = Console.ReadLine();
+                    Console.WriteLine("The following maps have been found:");
 
-                int inputInt;
+                    int i = 1;
 
-                if(!int.TryParse(input, out inputInt) || inputInt > maps.Length)
-                {
-                    Console.WriteLine("Invalid input, please try again.");
-                    continue;
-                }
+                    foreach (string m in maps)
+                    {
+                        Console.WriteLine(i + ") " + m.Substring(5, m.Length - 10));
+                        i++;
+                    }
 
-                inputInt--;
+                    Console.Write("Enter the number corresponding to the map you wish to restore on this PC: ");
+                    string input = Console.ReadLine();
 
-                Console.Write("Map '" + maps[inputInt] + " selected, is this correct? (Y/N): ");
+                    int inputInt;
 
-                string confirmation = Console.ReadLine();
+                    if (!int.TryParse(input, out inputInt) || inputInt > maps.Length)
+                    {
+                        Console.WriteLine("Invalid input, please try again.");
+                        continue;
+                    }
 
-                if(confirmation.Trim().ToLower() != "y")
-                {
-                    continue;
-                }
+                    inputInt--;
 
-                Console.Write("WARNING: This will overwrite your existing room setup, are you sure you wish to proceed? (Y/N): ");
-                confirmation = Console.ReadLine();
+                    Console.Write("Map '" + maps[inputInt] + " selected, is this correct? (Y/N): ");
 
-                if (confirmation.Trim().ToLower() != "y")
-                {
-                    continue;
-                }
+                    string confirmation = Console.ReadLine();
 
-                if(UnzipConfig(maps[inputInt], chaperonePath, lighthouseDbPath))
-                {
-                    Console.WriteLine("Room Setup extracted successfully, your universes are now in-sync! Press enter to return to the main menu.");
-                    Console.ReadLine();
-                    return;
+                    if (confirmation.Trim().ToLower() != "y")
+                    {
+                        continue;
+                    }
+
+                    Console.Write("WARNING: This will overwrite your existing room setup, are you sure you wish to proceed? (Y/N): ");
+                    confirmation = Console.ReadLine();
+
+                    if (confirmation.Trim().ToLower() != "y")
+                    {
+                        continue;
+                    }
+
+                    filename = maps[inputInt];
                 } else
                 {
-                    Console.WriteLine("Failed to extract room setup, press Enter to return to the main menu.");
-                    Console.ReadLine();
+                    filename = "maps/" + (loadFilename.ToLower().EndsWith(".rcfg") ? loadFilename : loadFilename + ".rcfg");
+                }
+
+                if (UnzipConfig(filename, chaperonePath, lighthouseDbPath))
+                {
+                    Console.WriteLine("Room Setup extracted successfully, your universes are now in-sync!");
+
+                    if (!automated)
+                    {
+                        Console.WriteLine("Press enter to return to the main menu.");
+                        Console.ReadLine();
+                    }
+
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("Failed to extract room setup");
+
+                    if (!automated)
+                    {
+                        Console.WriteLine("Press Enter to return to the main menu.");
+                        Console.ReadLine();
+                    }
+                    else
+                    {
+                        Environment.Exit(1);
+                    }
+
                     return;
                 }
             }
