@@ -10,9 +10,14 @@ You can download the latest build [here](https://github.com/FennecLabsLtd/Lighth
 
 It's so ridiculously easy to use, just run the EXE and the rest is self explanatory 
 
-## Coming Soon
+### Command Line Usage
 
-- Command Line args for event quicker, non-interactive deployment
+| Argument | Description |
+| -------- | ----------- |
+| -s [filename], --save [filename] | Specifies the map file to save to (with or without the .rcfg extension, it will be added automatically) |
+| -l [filename], --load [filename] | Specifies the file load from (again, with or without the .rcfg extension) |
+| -r, --restart | Stops SteamVR before running any save/load (generally only needed when loading), and starts it again when finished |
+| -?, --help | Displays the help text |
 
 ## Contributing
 
