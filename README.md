@@ -19,6 +19,16 @@ It's so ridiculously easy to use, just run the EXE and the rest is self explanat
 | `-r` | `--restart` | Stops SteamVR before running any save/load (generally only needed when loading), and starts it again when finished |
 | `-?`| `--help` | Displays the help text |
 
+### Examples
+
+To automate saving your current Lighthouse setup to file:
+
+`LighthouseManager.exe --save mymap.rcfg`
+
+To automate loading from file into SteamVR (overwriting your current config) and stopping/starting SteamVR to load up the new config:
+
+`LighthouseManager.exe --load mymap.rcfg --restart` 
+
 ## Contributing
 
 Contributions are always welcome, just submit a PR!
